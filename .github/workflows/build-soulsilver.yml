@@ -1,0 +1,48 @@
+name: build-soulsilver
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Update and Install Software
+        run: |
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+          sudo apt update
+          sudo apt -y --allow-downgrades install g++-10-multilib linux-libc-dev binutils-arm-none-eabi p7zip-full pkg-config libpugixml-dev ppa-purge
+          sudo ppa-purge -y ppa:ubuntu-toolchain-r/test || true
+          sudo dpkg --add-architecture i386
+          sudo mkdir -pm755 /etc/apt/keyrings
+          sudo wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+          sudo add-apt-repository ppa:cybermax-dexter/sdl2-backport
+          sudo wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/$(lsb_release -cs)/winehq-$(lsb_release -cs).sources
+          sudo apt update
+          sudo apt -y --allow-downgrades install --install-recommends winehq-stable
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
+
+      - name: Build SoulSilver
+        env:
+          GAME_VERSION: SOULSILVER
+          GAME_LANGUAGE: ENGLISH
+          GAME_REVISION: 0
+          LM_LICENSE_FILE: ${{ github.workspace }}/tools/mwccarm/license.dat
+        run: make -j4
+
+      - name: Upload ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokesoulsilver-modded
+          path: build/soulsilver.us/pokesoulsilver.us.nds
+          retention-days: 7
